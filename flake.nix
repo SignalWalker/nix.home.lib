@@ -48,6 +48,8 @@
               ]
               ++ extraModules;
           };
+        genHomeActivationPackages = sysHomeConfigurations:
+          std.mapAttrs (system: homeConfigurations: std.mapAttrs (cfgName: cfg: cfg.activationPackage) homeConfigurations);
         genHomeActivationApp = homeConfiguration: {
           type = "app";
           program = "${homeConfiguration.activationPackage}/activate";
