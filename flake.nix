@@ -14,6 +14,7 @@
   outputs = inputs @ {
     self,
     nixpkgs,
+    home-manager,
     ...
   }:
     with builtins; let
@@ -23,6 +24,7 @@
       lib = {
         utils = import ./src/utils.nix {inherit nixpkgs;};
         fs = import ./src/fs.nix;
+        hmSystems = attrNames home-manager.packages;
         collectInputModules' = moduleName: flakeInputs: foldl' (acc: i: acc ++ (std.optional (i ? homeManagerModules && i ? homeManagerModules.${moduleName}) i.homeManagerModules.${moduleName})) [] flakeInputs;
         collectInputModules = self.lib.collectInputModules' "default";
         genHomeConfiguration = {
