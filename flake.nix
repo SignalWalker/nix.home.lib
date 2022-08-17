@@ -23,7 +23,7 @@
       lib = {
         utils = import ./src/utils.nix {inherit (flakeInputs) nixpkgs;};
         fs = import ./src/fs.nix;
-        hmSystems = [ "x86_64-linux" "aarch64-linux" ];
+        hmSystems = ["x86_64-linux" "aarch64-linux"];
         genNixpkgsFor = {
           nixpkgs,
           systems ? self.lib.hmSystems,
@@ -50,7 +50,7 @@
         }:
           home-manager.lib.homeManagerConfiguration {
             inherit pkgs;
-            lib = pkgs.lib.extend (final: prev: { signal = self.lib; });
+            lib = pkgs.lib.extend (final: prev: {signal = self.lib;});
             modules =
               (self.lib.collectInputModules inputs)
               ++ [
