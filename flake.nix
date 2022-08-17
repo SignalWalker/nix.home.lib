@@ -20,10 +20,22 @@
       std = flakeInputs.nixpkgs.lib;
     in {
       formatter = std.mapAttrs (system: pkgs: pkgs.default) flakeInputs.alejandra.packages;
+      overlays.default = final: prev: {
+      };
       lib = {
         utils = import ./src/utils.nix {inherit (flakeInputs) nixpkgs;};
         fs = import ./src/fs.nix;
+        mkDefaultEnableOption = name: (std.mkEnableOption name) // {default = true;};
         hmSystems = ["x86_64-linux" "aarch64-linux"];
+        linkSystemApp = pkgs: {
+          app,
+          pname ? "system-${app}",
+          syspath ? "/usr/bin/${app}",
+        }:
+          pkgs.runCommandLocal pname {} ''
+            mkdir -p $out/bin
+            ln -sT ${syspath} $out/bin/${app}
+          '';
         genNixpkgsFor = {
           nixpkgs,
           systems ? self.lib.hmSystems,
@@ -35,12 +47,16 @@
               crossSystem = system;
               inherit overlays;
             });
-        collectInputModules' = moduleName: inputs:
+        collectInputAttrs = top: nxt: inputs:
           foldl' (
             acc: i:
-              acc ++ (std.optional (i ? homeManagerModules && i ? homeManagerModules.${moduleName}) i.homeManagerModules.${moduleName})
-          ) [] inputs;
+              acc ++ (std.optional (i ? ${top} && i ? ${top}.${nxt}) i.${top}.${nxt})
+          ) []
+          inputs;
+        collectInputModules' = self.lib.collectInputAttrs "homeManagerModules";
         collectInputModules = self.lib.collectInputModules' "default";
+        collectInputOverlays' = self.lib.collectInputAttrs "overlays";
+        collectInputOverlays = self.lib.collectInputOverlays' "default";
         genHomeConfiguration = {
           pkgs,
           modules ? [],
@@ -49,14 +65,16 @@
           home-manager.lib.homeManagerConfiguration {
             inherit pkgs;
             lib = pkgs.lib.extend (final: prev: {signal = self.lib;});
-            modules = modules ++ [
-              ({config, ...}: {
-                config = {
-                  home.username = username;
-                  home.homeDirectory = "/home/${config.home.username}";
-                };
-              })
-            ];
+            modules =
+              modules
+              ++ [
+                ({config, ...}: {
+                  config = {
+                    home.username = username;
+                    home.homeDirectory = "/home/${config.home.username}";
+                  };
+                })
+              ];
           };
         genHomeActivationPackages = sysHomeConfigurations:
           mapAttrs (system: homeConfigurations: mapAttrs (cfgName: cfg: cfg.activationPackage) homeConfigurations) sysHomeConfigurations;
