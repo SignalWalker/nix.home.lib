@@ -17,15 +17,26 @@
     ...
   }:
     with builtins; let
-      std = nixpkgs.lib;
+      std = inputs.nixpkgs.lib;
     in {
       formatter = std.mapAttrs (system: pkgs: pkgs.default) inputs.alejandra.packages;
       lib = {
         utils = import ./src/utils.nix {inherit (inputs) nixpkgs;};
         fs = import ./src/fs.nix;
         hmSystems = attrNames home-manager.packages;
-        genNixpkgsFor = { nixpkgs, systems, overlays ? [] }: std.genAttrs systems (system: import nixpkgs { localSystem = builtins.currentSystem or system; crossSystem = system; inherit overlays; });
-        collectInputModules' = moduleName: flakeInputs: foldl' (acc: i: acc ++ (std.optional (i ? homeManagerModules && i ? homeManagerModules.${moduleName}) i.homeManagerModules.${moduleName})) [] flakeInputs;
+        genNixpkgsFor = {
+          nixpkgs,
+          systems ? self.lib.hmSystems,
+          overlays ? [],
+        }:
+          std.genAttrs systems (system:
+            import nixpkgs {
+              localSystem = builtins.currentSystem or system;
+              crossSystem = system;
+              inherit overlays;
+            });
+        collectInputModules' = moduleName: flakeInputs:
+          foldl' (acc: i: acc ++ (std.optional (i ? homeManagerModules && i ? homeManagerModules.${moduleName}) i.homeManagerModules.${moduleName})) [] flakeInputs;
         collectInputModules = self.lib.collectInputModules' "default";
         genHomeConfiguration = {
           pkgs,
