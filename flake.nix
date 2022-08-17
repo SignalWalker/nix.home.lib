@@ -13,7 +13,6 @@
   };
   outputs = inputs @ {
     self,
-    nixpkgs,
     home-manager,
     ...
   }:
@@ -22,9 +21,10 @@
     in {
       formatter = std.mapAttrs (system: pkgs: pkgs.default) inputs.alejandra.packages;
       lib = {
-        utils = import ./src/utils.nix {inherit nixpkgs;};
+        utils = import ./src/utils.nix {inherit (inputs) nixpkgs;};
         fs = import ./src/fs.nix;
         hmSystems = attrNames home-manager.packages;
+        genNixpkgsFor = { nixpkgs, systems, overlays ? [] }: std.genAttrs systems (system: import nixpkgs { localSystem = builtins.currentSystem or system; crossSystem = system; inherit overlays; });
         collectInputModules' = moduleName: flakeInputs: foldl' (acc: i: acc ++ (std.optional (i ? homeManagerModules && i ? homeManagerModules.${moduleName}) i.homeManagerModules.${moduleName})) [] flakeInputs;
         collectInputModules = self.lib.collectInputModules' "default";
         genHomeConfiguration = {
@@ -49,7 +49,7 @@
               ++ extraModules;
           };
         genHomeActivationPackages = sysHomeConfigurations:
-          std.mapAttrs (system: homeConfigurations: std.mapAttrs (cfgName: cfg: cfg.activationPackage) homeConfigurations);
+          mapAttrs (system: homeConfigurations: mapAttrs (cfgName: cfg: cfg.activationPackage) homeConfigurations);
         genHomeActivationApp = homeConfiguration: {
           type = "app";
           program = "${homeConfiguration.activationPackage}/activate";
