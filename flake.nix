@@ -23,7 +23,7 @@
       lib = {
         utils = import ./src/utils.nix {inherit (flakeInputs) nixpkgs;};
         fs = import ./src/fs.nix;
-        hmSystems = attrNames home-manager.packages;
+        hmSystems = [ "x86_64-linux" "aarch64-linux" ];
         genNixpkgsFor = {
           nixpkgs,
           systems ? self.lib.hmSystems,
