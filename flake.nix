@@ -11,17 +11,17 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
-  outputs = inputs @ {
+  outputs = flakeInputs @ {
     self,
     home-manager,
     ...
   }:
     with builtins; let
-      std = inputs.nixpkgs.lib;
+      std = flakeInputs.nixpkgs.lib;
     in {
-      formatter = std.mapAttrs (system: pkgs: pkgs.default) inputs.alejandra.packages;
+      formatter = std.mapAttrs (system: pkgs: pkgs.default) flakeInputs.alejandra.packages;
       lib = {
-        utils = import ./src/utils.nix {inherit (inputs) nixpkgs;};
+        utils = import ./src/utils.nix {inherit (flakeInputs) nixpkgs;};
         fs = import ./src/fs.nix;
         hmSystems = attrNames home-manager.packages;
         genNixpkgsFor = {
@@ -35,20 +35,24 @@
               crossSystem = system;
               inherit overlays;
             });
-        collectInputModules' = moduleName: flakeInputs:
-          foldl' (acc: i: acc ++ (std.optional (i ? homeManagerModules && i ? homeManagerModules.${moduleName}) i.homeManagerModules.${moduleName})) [] flakeInputs;
+        collectInputModules' = moduleName: inputs:
+          foldl' (
+            acc: i:
+              acc ++ (std.optional (i ? homeManagerModules && i ? homeManagerModules.${moduleName}) i.homeManagerModules.${moduleName})
+          ) [] (attrValues inputs);
         collectInputModules = self.lib.collectInputModules' "default";
         genHomeConfiguration = {
           pkgs,
-          flakeInputs,
+          inputs,
           extraModules ? [],
           username ? "ash",
           ...
         }:
           home-manager.lib.homeManagerConfiguration {
             inherit pkgs;
+            lib = pkgs.lib.extend (final: prev: { signal = self.lib; });
             modules =
-              (self.lib.collectInputModules flakeInputs)
+              (self.lib.collectInputModules inputs)
               ++ [
                 ({config, ...}: {
                   config = {
@@ -60,7 +64,7 @@
               ++ extraModules;
           };
         genHomeActivationPackages = sysHomeConfigurations:
-          mapAttrs (system: homeConfigurations: mapAttrs (cfgName: cfg: cfg.activationPackage) homeConfigurations);
+          mapAttrs (system: homeConfigurations: mapAttrs (cfgName: cfg: cfg.activationPackage) homeConfigurations) sysHomeConfigurations;
         genHomeActivationApp = homeConfiguration: {
           type = "app";
           program = "${homeConfiguration.activationPackage}/activate";
