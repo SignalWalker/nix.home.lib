@@ -39,29 +39,24 @@
           foldl' (
             acc: i:
               acc ++ (std.optional (i ? homeManagerModules && i ? homeManagerModules.${moduleName}) i.homeManagerModules.${moduleName})
-          ) [] (attrValues inputs);
+          ) [] inputs;
         collectInputModules = self.lib.collectInputModules' "default";
         genHomeConfiguration = {
           pkgs,
-          inputs,
-          extraModules ? [],
+          modules ? [],
           username ? "ash",
-          ...
         }:
           home-manager.lib.homeManagerConfiguration {
             inherit pkgs;
             lib = pkgs.lib.extend (final: prev: {signal = self.lib;});
-            modules =
-              (self.lib.collectInputModules inputs)
-              ++ [
-                ({config, ...}: {
-                  config = {
-                    home.username = username;
-                    home.homeDirectory = "/home/${config.home.username}";
-                  };
-                })
-              ]
-              ++ extraModules;
+            modules = modules ++ [
+              ({config, ...}: {
+                config = {
+                  home.username = username;
+                  home.homeDirectory = "/home/${config.home.username}";
+                };
+              })
+            ];
           };
         genHomeActivationPackages = sysHomeConfigurations:
           mapAttrs (system: homeConfigurations: mapAttrs (cfgName: cfg: cfg.activationPackage) homeConfigurations) sysHomeConfigurations;
