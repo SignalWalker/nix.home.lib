@@ -62,8 +62,8 @@
           systems ? self.lib.hmSystems,
         }:
           if isList overlays
-          then self.lib.genNixpkgsForList inputs
-          else self.lib.genNixpkgsForFn inputs;
+          then self.lib.genNixpkgsForList { inherit nixpkgs overlays systems; }
+          else self.lib.genNixpkgsForFn { inherit nixpkgs systems; overlayFn = overlays; };
         mergeOverlays = overlays: foldl' (acc: overlay: (final: prev: (acc final prev) // (overlay final prev))) (final: prev: {}) overlays;
         selectOverlays' = flake: names: foldl' (acc: name: acc ++ (flake.lib.overlays.${name} or [])) [] names;
         collectInputAttrs = top: nxt: inputs:
