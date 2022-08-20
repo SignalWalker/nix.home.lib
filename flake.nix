@@ -36,17 +36,36 @@
             mkdir -p $out/bin
             ln -sT ${syspath} $out/bin/${app}
           '';
-        genNixpkgsFor = {
+        genNixpkgsForList = {
           nixpkgs,
-          systems ? self.lib.hmSystems,
-          overlays ? [],
+          overlays,
+          systems,
+        }:
+          self.lib.genNixpkgsForFn {
+            inherit nixpkgs systems;
+            overlayFn = system: overlays;
+          };
+        genNixpkgsForFn = {
+          nixpkgs,
+          overlayFn,
+          systems,
         }:
           std.genAttrs systems (system:
             import nixpkgs {
               localSystem = builtins.currentSystem or system;
               crossSystem = system;
-              inherit overlays;
+              overlays = overlayFn system;
             });
+        genNixpkgsFor = inputs @ {
+          nixpkgs,
+          overlays ? [],
+          systems ? self.lib.hmSystems,
+        }:
+          if isList overlays
+          then genNixpkgsForList inputs
+          else genNixpkgsForFn inputs;
+        mergeOverlays = overlays: foldl' (acc: overlay: (final: prev: (acc final prev) // (overlay final prev))) (final: prev: {}) overlays;
+        selectOverlays' = flake: names: foldl' (acc: name: acc ++ (flake.lib.overlays.${name} or [])) [] (names);
         collectInputAttrs = top: nxt: inputs:
           foldl' (
             acc: i:
@@ -57,6 +76,7 @@
         collectInputModules = self.lib.collectInputModules' "default";
         collectInputOverlays' = self.lib.collectInputAttrs "overlays";
         collectInputOverlays = self.lib.collectInputOverlays' "default";
+        aggregateOverlays = inputs: foldl' (acc: input: acc // (std.mapAttrs (name: overlay: (acc.${name} or []) ++ [overlay]) (input.overlays or {}))) {} inputs;
         genHomeConfiguration = {
           pkgs,
           modules ? [],
