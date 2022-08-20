@@ -65,7 +65,7 @@
           then genNixpkgsForList inputs
           else genNixpkgsForFn inputs;
         mergeOverlays = overlays: foldl' (acc: overlay: (final: prev: (acc final prev) // (overlay final prev))) (final: prev: {}) overlays;
-        selectOverlays' = flake: names: foldl' (acc: name: acc ++ (flake.lib.overlays.${name} or [])) [] (names);
+        selectOverlays' = flake: names: foldl' (acc: name: acc ++ (flake.lib.overlays.${name} or [])) [] names;
         collectInputAttrs = top: nxt: inputs:
           foldl' (
             acc: i:
