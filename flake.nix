@@ -62,8 +62,8 @@
           systems ? self.lib.hmSystems,
         }:
           if isList overlays
-          then genNixpkgsForList inputs
-          else genNixpkgsForFn inputs;
+          then self.lib.genNixpkgsForList inputs
+          else self.lib.genNixpkgsForFn inputs;
         mergeOverlays = overlays: foldl' (acc: overlay: (final: prev: (acc final prev) // (overlay final prev))) (final: prev: {}) overlays;
         selectOverlays' = flake: names: foldl' (acc: name: acc ++ (flake.lib.overlays.${name} or [])) [] names;
         collectInputAttrs = top: nxt: inputs:
