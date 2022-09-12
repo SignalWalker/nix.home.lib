@@ -18,24 +18,20 @@
   }:
     with builtins; let
       std = flakeInputs.nixpkgs.lib;
+      utils = import ./src/utils.nix {inherit (flakeInputs) nixpkgs;};
     in {
       formatter = std.mapAttrs (system: pkgs: pkgs.default) flakeInputs.alejandra.packages;
-      overlays.default = final: prev: {
-      };
       lib = {
-        utils = import ./src/utils.nix {inherit (flakeInputs) nixpkgs;};
-        fs = import ./src/fs.nix;
+        enum = import ./src/enum.nix flakeInputs;
+        fs = import ./src/fs.nix flakeInputs;
+        home = import ./src/home.nix flakeInputs;
+        list = import ./src/list.nix flakeInputs;
+        meta = import ./src/meta.nix flakeInputs;
+        monad = import ./src/monad.nix flakeInputs;
+        set = import ./src/set.nix flakeInputs;
+        signal = import ./src/signal.nix flakeInputs;
+        inherit utils;
         mkDefaultEnableOption = name: (std.mkEnableOption name) // {default = true;};
-        hmSystems = ["x86_64-linux" "aarch64-linux"];
-        linkSystemApp = pkgs: {
-          app,
-          pname ? "system-${app}",
-          syspath ? "/usr/bin/${app}",
-        }:
-          pkgs.runCommandLocal pname {} ''
-            mkdir -p $out/bin
-            ln -sT ${syspath} $out/bin/${app}
-          '';
         genNixpkgsForList = {
           nixpkgs,
           overlays,
@@ -59,57 +55,75 @@
         genNixpkgsFor = inputs @ {
           nixpkgs,
           overlays ? [],
-          systems ? self.lib.hmSystems,
+          systems ? self.lib.home.systems,
         }:
           if isList overlays
-          then self.lib.genNixpkgsForList { inherit nixpkgs overlays systems; }
-          else self.lib.genNixpkgsForFn { inherit nixpkgs systems; overlayFn = overlays; };
-        mergeOverlays = overlays: foldl' (acc: overlay: (final: prev: (acc final prev) // (overlay final prev))) (final: prev: {}) overlays;
-        selectOverlays' = flake: names: foldl' (acc: name: acc ++ (flake.lib.overlays.${name} or [])) [] names;
+          then self.lib.genNixpkgsForList {inherit nixpkgs overlays systems;}
+          else
+            self.lib.genNixpkgsForFn {
+              inherit nixpkgs systems;
+              overlayFn = overlays;
+            };
+        resolveDependencies = {
+          inputs,
+          filter ? [],
+          resolveFn ? (incumbent: challenger:
+            if incumbent.lastModified >= challenger.lastModified
+            then incumbent
+            else challenger),
+        }:
+          foldl' (acc: inputName: let
+            input = inputs.${inputName};
+          in
+            acc
+            // (std.mapAttrs (dName: dep:
+              if acc ? ${dName}
+              then resolveFn acc.${dName} dep
+              else dep)
+            (input.dependencies or {}))) (removeAttrs inputs (filter ++ ["self"])) (attrNames inputs);
+        collectSelfAndDepOverlays = flake: overlayNames: self.lib.set.selectFrom (map (flake: flake.overlays or {}) ([flake] ++ (attrValues flake.dependencies))) overlayNames;
+        zipFlakeOverlays = inputs: zipAttrsWith (name: values: values) (map (input: input.overlays or {}) inputs);
+        zipLibOverlays = inputs: zipAttrsWith (name: values: concatLists values) (map (input: input.lib.overlays or {}) inputs);
+        zipOverlays = {
+          inputs,
+          libFilter ? ["self"],
+          flakeFilter ? ["nixpkgs"],
+        }:
+          foldl' (acc: inputName: let
+            input = inputs.${inputName};
+            inputLibOverlays =
+              if elem inputName libFilter
+              then {}
+              else input.lib.overlays or {};
+            libOverlays = self.lib.concatAttrs acc inputLibOverlays;
+            inputFlakeOverlays =
+              if elem inputName flakeFilter
+              then {}
+              else input.overlays or {};
+          in
+            self.lib.set.append libOverlays inputFlakeOverlays) {} (attrNames inputs);
+        mergeOverlays = overlays: (final: prev: foldl' (acc: overlay: acc // (overlay final prev)) {} overlays);
+        aggregateOverlays = {
+          inputs,
+          filter ? ["self"],
+        }:
+          foldl' (acc: inputName: let
+            input = inputs.${inputName};
+          in
+            if elem inputName filter
+            then acc
+            else (zipAttrsWith (key: values: self.lib.mergeOverlays values) [acc (input.overlays or {})])) {} (attrNames inputs);
         collectInputAttrs = top: nxt: inputs:
           foldl' (
             acc: i:
               acc ++ (std.optional (i ? ${top} && i ? ${top}.${nxt}) i.${top}.${nxt})
           ) []
           inputs;
+        # exportFlakes = { flakes, filter = [ "self" ] }: foldl' () ;
         collectInputModules' = self.lib.collectInputAttrs "homeManagerModules";
         collectInputModules = self.lib.collectInputModules' "default";
         collectInputOverlays' = self.lib.collectInputAttrs "overlays";
         collectInputOverlays = self.lib.collectInputOverlays' "default";
-        aggregateOverlays = inputs: foldl' (acc: input: acc // (std.mapAttrs (name: overlay: (acc.${name} or []) ++ [overlay]) (input.overlays or {}))) {} inputs;
-        genHomeConfiguration = {
-          pkgs,
-          modules ? [],
-          username ? "ash",
-        }:
-          home-manager.lib.homeManagerConfiguration {
-            inherit pkgs;
-            lib = pkgs.lib.extend (final: prev: {signal = self.lib;});
-            modules =
-              modules
-              ++ [
-                ({config, ...}: {
-                  config = {
-                    home.username = username;
-                    home.homeDirectory = "/home/${config.home.username}";
-                  };
-                })
-              ];
-          };
-        genHomeActivationPackages = sysHomeConfigurations:
-          mapAttrs (system: homeConfigurations: mapAttrs (cfgName: cfg: cfg.activationPackage) homeConfigurations) sysHomeConfigurations;
-        genHomeActivationApp = homeConfiguration: {
-          type = "app";
-          program = "${homeConfiguration.activationPackage}/activate";
-        };
-        genHomeActivationApps = sysHomeConfigurations:
-          std.mapAttrs (system: homeConfigurations:
-            std.mapAttrs' (cfgName: cfg: {
-              name = "activate-${cfgName}";
-              value = self.lib.genHomeActivationApp cfg;
-            })
-            homeConfigurations)
-          sysHomeConfigurations;
       };
     };
 }
