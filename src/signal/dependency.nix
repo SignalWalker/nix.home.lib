@@ -57,7 +57,7 @@ in {
     else (mapFn (first ++ second));
   outputs.merge = dlib.outputs.merge' std.id;
   outputs.mergeSets' = mapFn: first: second:
-    assert (std.traceSeq ["dependency.outputs.mergeSets'" first second] true);
+    # assert (std.traceSeq ["dependency.outputs.mergeSets'" first second] true);
     assert isAttrs first;
     assert isAttrs second;
       first
@@ -103,7 +103,7 @@ in {
       foldl' (acc: depName: let dep = deps.${depName}; in dlib.outputs.mergeSets acc (dlib.outputs.collect' deps depName)) {} (attrNames deps);
   # fn({ flakeInput }, dependencyName, dependency) -> { dependency }
   resolve' = inputs: depName: dep':
-    assert (std.traceSeq ["dependency.resolve'" "{<inputs>}" depName (removeAttrs dep' ["input"])] true);
+    # assert (std.traceSeq ["dependency.resolve'" "{<inputs>}" depName (removeAttrs dep' ["input"])] true);
     assert dlib.isDep dep'; let
       dep = dep';
       input =
