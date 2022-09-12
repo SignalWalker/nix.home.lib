@@ -64,7 +64,14 @@ in {
       if val.keep
       then res ++ [val.value]
       else res) [] (fsl.path.listDirContents path);
-  path.listFileNames = path: fsl.path.filterMapContents { inherit path; fn = name: type: { keep = type == "regular"; value = name; }; };
+  path.listFileNames = path:
+    fsl.path.filterMapContents {
+      inherit path;
+      fn = name: type: {
+        keep = type == "regular";
+        value = name;
+      };
+    };
   path.listFilePaths = path:
     fsl.path.filterMapContents {
       inherit path;

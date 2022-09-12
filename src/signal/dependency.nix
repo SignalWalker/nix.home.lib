@@ -88,10 +88,10 @@ in {
       outputs;
     in
       assert traceVerbose "dependency.outputs.collect'.foldl'" (foldl' (res: name: let val = result'.${name}; in res && (isList val || (name != "signalModules" && isFunction val))) true (attrNames result'));
-        # "for every signalModule in result', merge that module's outputs into result'"
+      # "for every signalModule in result', merge that module's outputs into result'"
         foldl' (res: mod: let
           depOutputs = mlib.outputs.collect' {
-            dependencies = removeAttrs deps [ depName ];
+            dependencies = removeAttrs deps [depName];
             module = mod;
           };
         in
