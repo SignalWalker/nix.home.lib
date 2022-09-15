@@ -60,11 +60,17 @@ in {
     name ? "<unknown>",
   }:
     assert traceVerbose "flake.resolve ${name}" true;
-      (signal.flake.resolve' {
-        inherit flake name;
-        dependencies = signal.flake.dependencies.get flake;
-      })
-      .flake;
+    assert (attrNames (flake.signalModules or {"default" = {};})) == ["default"]; # otherwise unsupported
+      let
+        flakeDeps = signal.flake.dependencies.get flake;
+        flakeRes = signal.flake.resolve' {
+          inherit flake name;
+          dependencies = flakeDeps;
+        };
+        flake = flakeRes.flake;
+        resDeps = flakeRes.resolvedDependencies;
+      in
+        flake // {exports.default = foldl' (acc: depName: set.concat acc resDeps.${depName}.outputs) (flake.exports.default or {}) (attrNames flakeDeps);};
   resolve' = {
     dependencies,
     flake,

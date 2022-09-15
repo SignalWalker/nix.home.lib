@@ -43,15 +43,15 @@ in {
           crossSystem = system;
           overlays =
             (
-              if flake ? exports
-              then monad.resolve (flake.exports.overlays or []) system
+              if flake ? "exports" && flake.exports ? ${name}
+              then monad.resolve (flake.exports.${name}.overlays or []) system
               else []
             )
             ++ (set.select (flake.overlays or {}) ["default" system]);
         };
         depModules =
-          if flake ? exports
-          then monad.resolve (flake.exports.homeManagerModules or []) system
+          if flake ? "exports" && flake.exports ? ${name}
+          then monad.resolve (flake.exports.${name}.homeManagerModules or []) system
           else [];
       in
         home-manager.lib.homeManagerConfiguration {

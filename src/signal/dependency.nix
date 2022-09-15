@@ -57,9 +57,9 @@ in {
       };
       input = inputRes.flake;
       mapNames = key: names: set.selectUnique input.${key} names;
-    in {
-      resolvedDependencies = inputRes.resolvedDependencies;
-      dependency = {
+    in
+      inputRes.resolvedDependencies
+      // {
         __resolved = true;
         inherit input;
         outputs = foldl' (res: key:
@@ -76,5 +76,4 @@ in {
                 else (set.selectUnique input.${key} names);
             }) {} (attrNames dep.outputs);
       };
-    };
 }

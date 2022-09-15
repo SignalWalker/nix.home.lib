@@ -39,13 +39,11 @@ in {
         if dep.__resolved or (!(module.dependencies ? ${depName}))
         then res
         else
-          (let
-            depRes = dependency.resolve' {
+          (res
+            // (dependency.resolve' {
               dependencies = res;
               name = depName;
-            };
-          in
-            res // depRes.resolvedDependencies // depRes.dependency))
+            })))
       dependencies (attrNames dependencies);
       modResDeps = set.filter (key: dep: dep.__resolved or false) resolvedDeps;
     in {
