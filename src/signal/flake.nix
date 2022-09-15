@@ -61,6 +61,7 @@ in {
   }:
     assert traceVerbose "flake.resolve ${name}" true;
     assert (attrNames (flake.signalModules or {"default" = {};})) == ["default"]; # otherwise unsupported
+    
       let
         flakeDeps = signal.flake.dependencies.get flake;
         flakeRes = signal.flake.resolve' {
