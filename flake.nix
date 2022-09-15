@@ -20,6 +20,7 @@
       std = flakeInputs.nixpkgs.lib;
       utils = import ./src/utils.nix {inherit (flakeInputs) nixpkgs;};
     in {
+      inputs = flakeInputs;
       formatter = std.mapAttrs (system: pkgs: pkgs.default) flakeInputs.alejandra.packages;
       lib = {
         enum = import ./src/enum.nix flakeInputs;

@@ -9,6 +9,20 @@ with builtins; let
 in {
   select = set: names: foldl' (acc: name: acc ++ (std.optional (set ? ${name}) set.${name})) [] names;
   selectFrom = sets: names: foldl' (acc: s: acc ++ (set.select s names)) [] sets;
+  selectMapUnique = mapFn: set: names:
+    (foldl' (acc: name:
+        if !(elem name acc.keys)
+        then {
+          keys = acc.keys ++ [name];
+          values = acc.values ++ (std.optional (set ? ${name}) (mapFn name set.${name}));
+        }
+        else acc) {
+        keys = [];
+        values = [];
+      }
+      names)
+    .values;
+  selectUnique = s: names: set.selectMapUnique (key: val: val) s names;
   merge = mergeFn: first: second: first // (mapAttrs (key: val: mergeFn first second.${key} key) second);
   append = first: second: set.merge (key: f: sval: (f.${key} or []) ++ [sval]) first second;
   concat = first: second: set.merge (key: f: sval: (f.${key} or []) ++ sval) first second;

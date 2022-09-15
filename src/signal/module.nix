@@ -9,54 +9,50 @@ with builtins; let
   monad = self.lib.monad;
   set = self.lib.set;
   signal = self.lib.signal;
-  dlib = signal.dependency;
-  mlib = signal.module;
+  dependency = signal.dependency;
 in {
-  isUnresolved = module: isAttrs module.dependencies && isFunction module.outputs && !(module ? depOutputs);
-  # fn({ dependency }, signalModule) -> resolvedSignalModule
+  dependencies.collect = {
+    inputs, # { flakeInput }
+    module, # signalModule
+  }:
+  # -> { dependency }
+    assert traceVerbose "module.dependencies.collect ${module.name}" true;
+      foldl' (res: depName: let
+        dep = module.dependencies.${depName};
+      in
+        dependency.set.merge res (signal.flake.toDependencies {
+          inherit inputs;
+          flake = dep.input;
+          outputs = dep.outputs;
+          name = depName;
+        }))
+      module.dependencies (attrNames module.dependencies);
   resolve' = {
     dependencies,
     module,
-    name ? module.name,
+    name,
   }:
-    assert traceVerbose "module.resolve' ${name}" true;
-    assert isAttrs dependencies;
-    assert mlib.isUnresolved module; {
-      inherit dependencies;
-      name = "${name}'";
-      outputs = module.outputs dependencies;
-      depOutputs = dlib.outputs.collect dependencies;
+    assert traceVerbose "module.resolve' ${name}" true; let
+      resolvedDeps = foldl' (res: depName: let
+        dep = res.${depName};
+      in
+        if dep.__resolved or (!(module.dependencies ? ${depName}))
+        then res
+        else
+          (let
+            depRes = dependency.resolve' {
+              dependencies = res;
+              name = depName;
+            };
+          in
+            res // depRes.resolvedDependencies // depRes.dependency))
+      dependencies (attrNames dependencies);
+      modResDeps = set.filter (key: dep: dep.__resolved or false) resolvedDeps;
+    in {
+      resolvedDependencies = modResDeps;
+      module = {
+        inherit (module) name dependencies;
+        outputs = module.outputs (mapAttrs (key: dep: dep.input) modResDeps);
+      };
     };
-  # fn({ flakeInput }, signalModule) -> resolvedSignalModule
-  resolve = {
-    inputs,
-    module,
-    name ? module.name,
-  }:
-    assert traceVerbose "module.resolve ${name}" true;
-      mlib.resolve' {
-        dependencies = dlib.resolve inputs module.dependencies;
-        inherit module name;
-      };
-  outputs.collect' = {
-    dependencies,
-    module,
-    name ? module.name,
-  }:
-    assert traceVerbose "module.outputs.collect' ${name}" true;
-      mlib.outputs.collect {
-        module = mlib.resolve' {inherit dependencies module name;};
-        inherit name;
-      };
-  outputs.collect = {
-    module,
-    name ? module.name,
-  }:
-    assert traceVerbose "module.outputs.collect ${name}" true;
-      dlib.outputs.mergeSets (mapAttrs (key: output:
-        if isFunction output
-        then (system: [(output system)])
-        else (attrValues output))
-      module.outputs)
-      module.depOutputs;
 }

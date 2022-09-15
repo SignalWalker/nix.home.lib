@@ -9,6 +9,7 @@ with builtins; let
   lib = self.lib;
   home = lib.home;
   module = lib.signal.module;
+  sigflake = lib.signal.flake;
   monad = lib.monad;
 in {
   systems = ["x86_64-linux" "aarch64-linux"];
@@ -21,78 +22,61 @@ in {
       mkdir -p $out/bin
       ln -sT ${syspath} $out/bin/${app}
     '';
-  genConfigurations' = {
-    nixpkgs,
-    resolvedModules,
+  configuration.fromFlake = {
+    flake,
+    nixpkgs ? flake.inputs.nixpkgs,
+    homeRoot ? "/home",
     username ? "ash",
-    extraModules ? [],
+    moduleNames ? ["default"],
     systems ? home.systems,
-  }:
+    flakeName ? "<unknown>",
+  }: let
+    flake' = sigflake.resolve {
+      inherit flake;
+      name = flakeName;
+    };
+  in
     std.genAttrs systems (system:
-      std.mapAttrs (name: mod: let
-        mOutputs = module.outputs.collect {module = mod;};
+      std.genAttrs moduleNames (name: let
         pkgs = import nixpkgs {
           localSystem = builtins.currentSystem or system;
           crossSystem = system;
-          overlays = mOutputs.overlays system;
+          overlays =
+            (
+              if flake ? exports
+              then monad.resolve (flake.exports.overlays or []) system
+              else []
+            )
+            ++ (set.select (flake.overlays or {}) ["default" system]);
         };
+        depModules =
+          if flake ? exports
+          then monad.resolve (flake.exports.homeManagerModules or []) system
+          else [];
       in
         home-manager.lib.homeManagerConfiguration {
           inherit pkgs;
           lib = pkgs.lib.extend (final: prev: {signal = self.lib;});
           modules =
-            (monad.resolve mOutputs.homeManagerModules system)
+            depModules
             ++ [
               ({config, ...}: {
                 config = {
                   home.username = username;
-                  home.homeDirectory = "/home/${config.home.username}";
+                  home.homeDirectory = "${homeRoot}/${username}";
                 };
               })
-            ]
-            ++ extraModules;
-        })
-      resolvedModules);
-  genConfigurations = flake:
-    home.genConfigurations' {
-      nixpkgs = flake.inputs.nixpkgs;
-      resolvedModules = mapAttrs (name: mod:
-        module.resolve {
-          inputs = flake.inputs;
-          module = mod;
-        })
-      flake.signalModules;
-    };
-  genConfiguration = {
-    pkgs,
-    modules ? [],
-    username ? "ash",
-  }:
-    home-manager.lib.homeManagerConfiguration {
-      inherit pkgs;
-      lib = pkgs.lib.extend (final: prev: {signal = self.lib;});
-      modules =
-        modules
-        ++ [
-          ({config, ...}: {
-            config = {
-              home.username = username;
-              home.homeDirectory = "/home/${config.home.username}";
-            };
-          })
-        ];
-    };
-  genActivationPackages = sysHomeConfigurations:
-    mapAttrs (system: homeConfigurations: mapAttrs (cfgName: cfg: cfg.activationPackage) homeConfigurations) sysHomeConfigurations;
-  genActivationApp = homeConfiguration: {
-    type = "app";
-    program = "${homeConfiguration.activationPackage}/activate";
-  };
-  genActivationApps = sysHomeConfigurations:
+            ];
+        }));
+  package.fromHomeConfigurations = sysHomeConfigs: mapAttrs (system: homeConfigs: maoAttrs (cfgName: cfg: cfg.activationPackage) homeConfigs) sysHomeConfigs;
+  app.fromHomeConfigurations = sysHomeConfigurations:
     std.mapAttrs (system: homeConfigurations:
       std.mapAttrs' (cfgName: cfg: {
         name = "activate-${cfgName}";
-        value = home.genActivationApp cfg;
+        value = {
+          type = "app";
+          program = "${cfg.activationPackage}/activate";
+        };
       })
       homeConfigurations)
     sysHomeConfigurations;

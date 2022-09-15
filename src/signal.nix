@@ -24,4 +24,5 @@ with builtins; let
 in {
   dependency = import ./signal/dependency.nix inputs;
   module = import ./signal/module.nix inputs;
+  flake = import ./signal/flake.nix inputs;
 }
