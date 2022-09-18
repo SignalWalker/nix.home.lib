@@ -14,6 +14,7 @@ with builtins; let
   set = self.lib.set;
   signal = self.lib.signal;
   dependency = signal.dependency;
+  flake = signal.flake;
 in {
   outputs.merge = first: second:
     first
@@ -37,14 +38,15 @@ in {
     outputs = dependency.outputs.merge first.outputs second.outputs;
   };
   set.merge = first: second:
-    first
-    // (mapAttrs (key: sDep: let
-      fDep = first.${key} or null;
-    in
-      if fDep == null
-      then sDep
-      else dependency.merge fDep sDep)
-    second);
+    # assert traceVerbose "dependency.set.merge {${toString (attrNames first)}} {${toString (attrNames second)}}" true;
+      first
+      // (mapAttrs (key: sDep: let
+        fDep = first.${key} or null;
+      in
+        if fDep == null
+        then sDep
+        else assert traceVerbose "dependency.set.merge [COLLISION]: ${key}" true; dependency.merge fDep sDep)
+      second);
   resolve' = {
     dependencies,
     name,
@@ -60,20 +62,22 @@ in {
     in
       inputRes.resolvedDependencies
       // {
-        __resolved = true;
-        inherit input;
-        outputs = foldl' (res: key:
-          if !(input ? ${key})
-          then res
-          else
-            res
-            // {
-              ${key} = let
-                names = dep.outputs.${key};
-              in
-                if isFunction names
-                then (system: set.selectUnique input.${key} (names system))
-                else (set.selectUnique input.${key} names);
-            }) {} (attrNames dep.outputs);
+        ${name} = {
+          __resolved = true;
+          inherit input;
+          outputs = foldl' (res: key:
+            if !(input ? ${key})
+            then res
+            else
+              res
+              // {
+                ${key} = let
+                  names = dep.outputs.${key};
+                in
+                  if isFunction names
+                  then (system: set.selectUnique input.${key} (names system))
+                  else (set.selectUnique input.${key} names);
+              }) {} (attrNames dep.outputs);
+        };
       };
 }

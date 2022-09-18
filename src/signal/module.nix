@@ -21,7 +21,7 @@ in {
         dep = module.dependencies.${depName};
       in
         dependency.set.merge res (signal.flake.toDependencies {
-          inherit inputs;
+          # inherit inputs;
           flake = dep.input;
           outputs = dep.outputs;
           name = depName;
@@ -37,7 +37,7 @@ in {
         dep = res.${depName};
       in
         if dep.__resolved or (!(module.dependencies ? ${depName}))
-        then res
+        then (assert traceVerbose "module.resolve'(${name}) <<!! ${depName} already resolved !!>>" true; res)
         else
           (res
             // (dependency.resolve' {
