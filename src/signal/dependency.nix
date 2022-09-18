@@ -38,15 +38,15 @@ in {
     outputs = dependency.outputs.merge first.outputs second.outputs;
   };
   set.merge = first: second:
-    # assert traceVerbose "dependency.set.merge {${toString (attrNames first)}} {${toString (attrNames second)}}" true;
-      first
-      // (mapAttrs (key: sDep: let
-        fDep = first.${key} or null;
-      in
-        if fDep == null
-        then sDep
-        else assert traceVerbose "dependency.set.merge [COLLISION]: ${key}" true; dependency.merge fDep sDep)
-      second);
+  # assert traceVerbose "dependency.set.merge {${toString (attrNames first)}} {${toString (attrNames second)}}" true;
+    first
+    // (mapAttrs (key: sDep: let
+      fDep = first.${key} or null;
+    in
+      if fDep == null
+      then sDep
+      else assert traceVerbose "dependency.set.merge [COLLISION]: ${key}" true; dependency.merge fDep sDep)
+    second);
   resolve' = {
     dependencies,
     name,

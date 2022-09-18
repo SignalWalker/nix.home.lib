@@ -89,10 +89,11 @@ in {
         };
         mod = modRes.module;
         resolvedDeps = modRes.resolvedDependencies;
-      in assert traceVerbose "flake.resolve'(${name}).foldl' ${name}.signalModules.${modName}" true; {
-        resolvedDependencies = res.resolvedDependencies // resolvedDeps;
-        flake = res.flake // (foldl' (acc: key: acc // {${key}.${modName} = mod.outputs.${key};}) {} (attrNames mod.outputs));
-      })
+      in
+        assert traceVerbose "flake.resolve'(${name}).foldl' ${name}.signalModules.${modName}" true; {
+          resolvedDependencies = res.resolvedDependencies // resolvedDeps;
+          flake = res.flake // (foldl' (acc: key: acc // {${key}.${modName} = mod.outputs.${key};}) {} (attrNames mod.outputs));
+        })
       {
         resolvedDependencies = {};
         inherit flake;
