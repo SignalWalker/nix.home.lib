@@ -32,10 +32,11 @@ in {
     systems ? home.systems,
     flakeName ? "<unknown>",
   }: let
-    flake' = sigflake.resolve {
-      inherit flake;
-      name = flakeName;
-    };
+    flake' = assert traceVerbose "home.configuration.fromFlake(${flakeName}).flake'" true;
+      sigflake.resolve {
+        inherit flake;
+        name = flakeName;
+      };
   in
     assert traceVerbose "home.configuration.fromFlake ${flakeName}" true;
       std.genAttrs systems (system:
@@ -44,29 +45,22 @@ in {
             pkgs = import nixpkgs {
               localSystem = builtins.currentSystem or system;
               crossSystem = system;
-              overlays =
-                (
-                  if flake ? "exports" && flake.exports ? ${name}
-                  then monad.resolve (flake.exports.${name}.overlays or []) system
-                  else []
-                )
-                ++ (set.select (flake.overlays or {}) ["default" system]);
+              overlays = let
+                expOverlays = monad.resolve (flake'.exports.${name}.overlays or []) system;
+              in
+                (std.traceSeq ["home.configuration.fromFlake(${flakeName})(${system}.${name}) overlays@" expOverlays] expOverlays)
+                ++ (set.select (flake'.overlays or {}) ["default" system]);
             };
             depModules =
-              if flake ? "exports" && flake.exports ? ${name}
-              then monad.resolve (flake.exports.${name}.homeManagerModules or []) system
-              else [];
+              traceVerbose "home.configuration.fromFlake(${flakeName})(${system}.${name}).depModules"
+              (monad.resolve (flake'.exports.${name}.homeManagerModules or []) system);
           in
             home-manager.lib.homeManagerConfiguration {
               inherit pkgs;
               lib = pkgs.lib.extend (final: prev: {signal = self.lib;});
-              modules =
+              modules = assert std.traceSeq ["home.configuration.fromFlake(${flakeName}})(${system}.${name}).modules depModules@" depModules] true;
                 depModules
-                ++ (
-                  if flake' ? "homeManagerModules" && flake'.homeManagerModules ? ${name}
-                  then [flake'.homeManagerModules.${name}]
-                  else []
-                )
+                ++ [(flake'.homeManagerModules.${name} or ({...}: {}))]
                 ++ [
                   ({config, ...}: {
                     config = {
@@ -76,17 +70,22 @@ in {
                   })
                 ];
             }));
-  package.fromHomeConfigurations = sysHomeConfigs: assert traceVerbose "home.package.fromHomeConfigurations {${toString (attrNames sysHomeConfigs)}}" true; mapAttrs (system: homeConfigs: mapAttrs (cfgName: cfg: cfg.activationPackage) homeConfigs) sysHomeConfigs;
+  package.fromHomeConfigurations = sysHomeConfigs:
+    mapAttrs (system: homeConfigs:
+      assert traceVerbose "home.package.fromHomeConfigurations ${system}: {${toString (attrNames homeConfigs)}}" true;
+        mapAttrs (cfgName: cfg: assert traceVerbose "home.package.fromHomeConfigurations.${system} ${cfgName}" true; cfg.activationPackage) homeConfigs)
+    sysHomeConfigs;
   app.fromHomeConfigurations = sysHomeConfigurations:
-    assert traceVerbose "home.package.fromHomeConfigurations {${toString (attrNames sysHomeConfigs)}}" true;
-      std.mapAttrs (system: homeConfigurations:
-        std.mapAttrs' (cfgName: cfg: {
-          name = "activate-${cfgName}";
-          value = {
-            type = "app";
-            program = "${cfg.activationPackage}/activate";
-          };
-        })
+    std.mapAttrs (system: homeConfigurations:
+      assert traceVerbose "home.app.fromHomeConfigurations ${system}: {${toString (attrNames homeConfigurations)}}" true;
+        std.mapAttrs' (cfgName: cfg:
+          assert traceVerbose "home.app.fromHomeConfigurations.${system} ${cfgName}" true; {
+            name = "activate-${cfgName}";
+            value = {
+              type = "app";
+              program = "${cfg.activationPackage}/activate";
+            };
+          })
         homeConfigurations)
-      sysHomeConfigurations;
+    sysHomeConfigurations;
 }

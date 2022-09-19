@@ -33,24 +33,28 @@ in {
     name,
   }:
     assert traceVerbose "module.resolve' ${name}" true; let
-      resolvedDeps = foldl' (res: depName: let
-        dep = res.${depName};
+      depDiv = set.divide (key: val: val.__resolved or false) dependencies;
+      resDeps = depDiv.inner;
+      unresDeps = depDiv.outer;
+      modResDeps = foldl' (res: depName: let
+        dep = dependencies.${depName};
       in
-        if dep.__resolved or (!(module.dependencies ? ${depName}))
-        then (assert traceVerbose "module.resolve'(${name}) <<!! ${depName} already resolved !!>>" true; res)
+        if dep.__resolved or false
+        then (assert traceVerbose "module.resolve'(${name}) ${depName} already resolved" true; res)
+        else if (!(module.dependencies ? ${depName}))
+        then assert traceVerbose "module.resolve'(${name}) ${depName} not required" true; res
         else
           (res
             // (dependency.resolve' {
-              dependencies = res;
+              dependencies = dependencies // res;
               name = depName;
             })))
-      dependencies (attrNames dependencies);
-      modResDeps = set.filter (key: dep: dep.__resolved or false) resolvedDeps;
+      {} (attrNames dependencies);
     in {
       resolvedDependencies = modResDeps;
       module = {
         inherit (module) name dependencies;
-        outputs = module.outputs (mapAttrs (key: dep: dep.input) modResDeps);
+        outputs = module.outputs (mapAttrs (key: dep: dep.input) (resDeps // modResDeps));
       };
     };
 }

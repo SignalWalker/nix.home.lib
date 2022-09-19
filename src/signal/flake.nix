@@ -12,16 +12,23 @@ with builtins; let
   dependency = signal.dependency;
   module = signal.module;
 in {
-  dependencies.get = flake:
-    assert traceVerbose "flake.dependencies.get flake.inputs@{${toString (attrNames flake.inputs)}}" true;
-    # for each signalModule "mod" in flake:
-    #   res = dependency.set.merge res (module.toDependencies { inherit inputs; module = mod; })
-    # return res
-      foldl' (res: modName:
-        dependency.set.merge res (module.dependencies.collect {
-          inputs = flake.inputs;
-          module = flake.signalModules.${modName};
-        })) {} (attrNames (flake.signalModules or {}));
+  dependencies.get = {
+    flake,
+    name,
+  }:
+    if !flake ? "inputs"
+    then assert traceVerbose "flake.dependencies.get ${name} <not a flake>" true; {}
+    else
+      assert traceVerbose "flake.dependencies.get ${name} flake.inputs@{${toString (attrNames flake.inputs)}}" true;
+      # for each signalModule "mod" in flake:
+      #   res = dependency.set.merge res (module.toDependencies { inherit inputs; module = mod; })
+      # return res
+        foldl' (res: modName:
+          assert traceVerbose "flake.dependencies.get(${name}).foldl' signalModules.${modName}" true;
+            dependency.set.merge res (module.dependencies.collect {
+              inputs = flake.inputs;
+              module = flake.signalModules.${modName};
+            })) {} (attrNames (flake.signalModules or {}));
   toDependencies = {
     flake,
     name,
@@ -30,33 +37,39 @@ in {
       overlays = system: ["default" system];
     },
   }:
-    assert traceVerbose "flake.toDependencies ${name} flake.inputs@{${toString (attrNames flake.inputs)}}" true;
-      dependency.set.merge (signal.flake.dependencies.get flake) {
-        ${name} = {
-          input = flake;
-          inherit outputs;
+    if !flake ? "inputs"
+    then assert traceVerbose "flake.toDependencies ${name} <not a flake>" true; {}
+    else
+      assert traceVerbose "flake.toDependencies ${name} flake.inputs@{${toString (attrNames flake.inputs)}}" true;
+        dependency.set.merge (signal.flake.dependencies.get {inherit flake name;}) {
+          ${name} = {
+            input = flake;
+            inherit outputs;
+          };
         };
-      };
   set.toDependencies = {
     flakes,
     filter ? [],
     inputs ? flakes,
-    outputs ? {
-      homeManagerModules = ["default"];
-      overlays = system: ["default" system];
-    },
+    outputs ? {},
   }:
-    assert traceVerbose "flake.set.toDependencies flakes@{${toString (attrNames flakes)}} filter@[self ${toString filter}]" true; let
+    assert traceVerbose "flake.set.toDependencies flakes@{${toString (attrNames flakes)}} filter@[${toString (["self"] ++ filter)}]" true; let
       flakes' = removeAttrs flakes (["self"] ++ filter);
       inputs' = removeAttrs flakes ["self"];
+      defaultOutputs = {
+        homeManagerModules = ["default"];
+        overlays = system: ["default" system];
+      };
     in
       foldl' (res: name: let
         flake = flakes'.${name};
       in
-        dependency.set.merge res (signal.flake.toDependencies {
-          # inputs = inputs';
-          inherit flake name outputs;
-        })) {} (attrNames flakes');
+        assert traceVerbose "flake.set.toDependencies().foldl' ${name}" true;
+          dependency.set.merge res (signal.flake.toDependencies {
+            # inputs = inputs';
+            inherit flake name;
+            outputs = outputs.${name} or defaultOutputs;
+          })) {} (attrNames flakes');
   resolve = {
     flake,
     name ? "<unknown>",
@@ -65,16 +78,17 @@ in {
     assert (attrNames (flake.signalModules or {"default" = {};})) == ["default"]; # otherwise unsupported
     
       let
-        flakeDeps = assert traceVerbose "flake.resolve(${name}).flakeDeps" true; signal.flake.dependencies.get flake;
+        flakeDeps = assert traceVerbose "flake.resolve(${name}).flakeDeps" true; signal.flake.dependencies.get {inherit flake name;};
         flakeRes = assert traceVerbose "flake.resolve(${name}).flakeRes" true;
           signal.flake.resolve' {
             inherit flake name;
             dependencies = flakeDeps;
           };
-        flake' = assert traceVerbose "flake.resolve(${name}).flake'" true; flakeRes.flake;
-        resDeps = assert traceVerbose "flake.resolve(${name}).resDeps" true; flakeRes.resolvedDependencies;
+        flake' = traceVerbose "flake.resolve(${name}).flake'" flakeRes.flake;
+        resDeps = traceVerbose "flake.resolve(${name}).resDeps" flakeRes.resolvedDependencies;
+        exports = traceVerbose "flake.resolve(${name}).exports" (foldl' (acc: depName: set.mConcat acc resDeps.${depName}.outputs) (flake'.exports.default or {}) (attrNames flakeDeps));
       in
-        flake' // {exports.default = foldl' (acc: depName: set.concat acc resDeps.${depName}.outputs) (flake'.exports.default or {}) (attrNames flakeDeps);};
+        flake' // {exports.default = traceVerbose "flake.resolve(${name}) exports.default@{${toString (attrNames exports)})}" exports;};
   resolve' = {
     dependencies,
     flake,
