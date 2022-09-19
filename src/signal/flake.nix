@@ -38,7 +38,13 @@ in {
     },
   }:
     if !flake ? "inputs"
-    then assert traceVerbose "flake.toDependencies ${name} <not a flake>" true; {}
+    then
+      traceVerbose "flake.toDependencies ${name} <not a flake>" {
+        ${name} = {
+          input = flake;
+          inherit outputs;
+        };
+      }
     else
       assert traceVerbose "flake.toDependencies ${name} flake.inputs@{${toString (attrNames flake.inputs)}}" true;
         dependency.set.merge (signal.flake.dependencies.get {inherit flake name;}) {
