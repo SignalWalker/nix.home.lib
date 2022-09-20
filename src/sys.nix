@@ -38,7 +38,7 @@ in {
           inherit crossSystem;
           overlays = (monad.resolve (flake'.exports.${modName}.overlays or []) crossSystem) ++ selfOverlays;
         };
-        pkgsLibExtended = pkgs.lib.extend (final: prev: { signal = self.lib; });
+        pkgsLibExtended = pkgs.lib.extend (final: prev: {signal = self.lib;});
         depModules = monad.resolve (flake'.exports.${modName}.nixosModules or []) crossSystem;
         extraModules' = monad.resolve extraModules {
           inherit crossSystem;
@@ -56,15 +56,20 @@ in {
               depModules
               ++ [
                 flake'.nixosModules.${modName}
-                ({lib,...}: {
+                ({lib, ...}: {
                   config = {
                     networking.hostName = lib.mkDefault (hostNameMap.${modName} or hostNameMap.__default or modName);
                     home-manager = {
-                      sharedModules = depHmModules ++ selfHmModules ++ [ ({...}: {
-                        config = {
-                          system.isNixOS = true;
-                        };
-                      }) ];
+                      sharedModules =
+                        depHmModules
+                        ++ selfHmModules
+                        ++ [
+                          ({...}: {
+                            config = {
+                              system.isNixOS = true;
+                            };
+                          })
+                        ];
                       extraSpecialArgs.lib = import "${home-manager}/modules/lib/stdlib-extended.nix" pkgsLibExtended;
                       useGlobalPkgs = true;
                       useUserPackages = true;

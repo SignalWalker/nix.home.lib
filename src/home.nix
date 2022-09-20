@@ -32,7 +32,7 @@ in {
     systems ? home.systems,
     flakeName ? "<unknown>",
     localSystem ? null,
-    extraModules ? []
+    extraModules ? [],
   }: let
     flake' = assert traceVerbose "home.configuration.fromFlake(${flakeName}).flake'" true;
       sigflake.resolve {
@@ -73,7 +73,8 @@ in {
                       home.homeDirectory = "${homeRoot}/${username}";
                     };
                   })
-                ] ++ extraModules;
+                ]
+                ++ extraModules;
             }));
   package.fromHomeConfigurations = sysHomeConfigs:
     mapAttrs (system: homeConfigs:
