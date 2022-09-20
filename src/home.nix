@@ -31,6 +31,8 @@ in {
     moduleNames ? ["default"],
     systems ? home.systems,
     flakeName ? "<unknown>",
+    localSystem ? null,
+    extraModules ? []
   }: let
     flake' = assert traceVerbose "home.configuration.fromFlake(${flakeName}).flake'" true;
       sigflake.resolve {
@@ -43,7 +45,10 @@ in {
         std.genAttrs moduleNames (name:
           assert traceVerbose "home.configuration.fromFlake(${flakeName}) ${system}.${name}" true; let
             pkgs = import nixpkgs {
-              localSystem = builtins.currentSystem or system;
+              localSystem =
+                if localSystem != null
+                then localSystem
+                else builtins.currentSystem or system;
               crossSystem = system;
               overlays = let
                 expOverlays = monad.resolve (flake'.exports.${name}.overlays or []) system;
@@ -68,7 +73,7 @@ in {
                       home.homeDirectory = "${homeRoot}/${username}";
                     };
                   })
-                ];
+                ] ++ extraModules;
             }));
   package.fromHomeConfigurations = sysHomeConfigs:
     mapAttrs (system: homeConfigs:

@@ -22,6 +22,16 @@
     in {
       inputs = flakeInputs;
       formatter = std.mapAttrs (system: pkgs: pkgs.default) flakeInputs.alejandra.packages;
+      templates = {
+        home = {
+          path = ./templates/home;
+          description = "A simple home-manager flake using signal modules";
+        };
+        sys = {
+          path = ./templates/sys;
+          description = "A simple NixOS configuration flake using signal modules";
+        };
+      };
       lib = {
         enum = import ./src/enum.nix flakeInputs;
         fs = import ./src/fs.nix flakeInputs;
@@ -31,6 +41,7 @@
         monad = import ./src/monad.nix flakeInputs;
         set = import ./src/set.nix flakeInputs;
         signal = import ./src/signal.nix flakeInputs;
+        sys = import ./src/sys.nix flakeInputs;
         inherit utils;
         mkDefaultEnableOption = name: (std.mkEnableOption name) // {default = true;};
         genNixpkgsForList = {
