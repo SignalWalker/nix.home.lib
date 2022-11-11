@@ -17,14 +17,15 @@ in {
   linkSystemApp = pkgs: {
     app,
     pname ? "system-${app}",
-    syspath ? "/usr/bin/${app}",
+    syspathBase ? "/usr/bin",
+    syspath ? "${syspathBase}/${app}",
     extraApps ? [],
   }:
-    pkgs.runCommandLocal pname {} ''
-      mkdir -p $out/bin
-      ln -sT ${syspath} $out/bin/${app}
-    ''
-    + (concatStringsSep "\n" (map (app: "ln -sT ${app} $out/bin/${app}") extraApps));
+    pkgs.runCommandLocal pname {} (''
+        mkdir -p $out/bin
+        ln -sT ${syspath} $out/bin/${app}
+      ''
+      + (concatStringsSep "\n" (map (app: "ln -sT ${syspathBase}/${app} $out/bin/${app}") extraApps)));
   configuration.fromFlake = {
     flake,
     nixpkgs ? flake.inputs.nixpkgs,
