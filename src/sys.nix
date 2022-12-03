@@ -28,15 +28,14 @@ in {
   in
     foldl' (sysAcc: crossSystem:
       foldl' (modAcc: modName: let
-        selfOverlays = set.select (flake'.overlays or {}) ["default" crossSystem modName];
         selfHmModules = set.select (flake'.homeManagerModules or {}) ["default" crossSystem modName];
-        pkgs = import nixpkgs {
+        pkgs = self.lib.signal.flake.resolved.nixpkgs {
+          inherit nixpkgs flake' crossSystem selfOverlays;
           localSystem =
             if localSystem != null
             then localSystem
             else builtins.currentSystem or crossSystem;
-          inherit crossSystem;
-          overlays = (monad.resolve (flake'.exports.${modName}.overlays or []) crossSystem) ++ selfOverlays;
+          signalModuleName = modName;
         };
         pkgsLibExtended = pkgs.lib.extend (final: prev: {signal = self.lib;});
         depModules = monad.resolve (flake'.exports.${modName}.nixosModules or []) crossSystem;

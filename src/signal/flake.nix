@@ -76,6 +76,20 @@ in {
             inherit flake name;
             outputs = outputs.${name} or defaultOutputs;
           })) {} (attrNames flakes');
+  resolved.nixpkgs = {
+    nixpkgs,
+    flake',
+    signalModuleName,
+    crossSystem,
+    localSystem ? builtins.currentSystem or crossSystem,
+  }: let
+    selfOverlays = set.select (flake'.overlays or {}) ["default" crossSystem signalModuleName];
+  in
+    import nixpkgs {
+      inherit localSystem;
+      inherit crossSystem;
+      overlays = (monad.resolve (flake'.exports.${signalModuleName}.overlays or []) crossSystem) ++ selfOverlays;
+    };
   resolve = {
     flake,
     name ? "<unknown>",
