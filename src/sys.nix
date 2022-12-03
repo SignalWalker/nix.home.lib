@@ -37,7 +37,7 @@ in {
             else builtins.currentSystem or crossSystem;
           signalModuleName = modName;
         };
-        pkgsLibExtended = pkgs.lib.extend (final: prev: {signal = self.lib;});
+        pkgsLibExtended = self.lib.signal.flake.resolved.stdlib {nixpkgs' = pkgs;};
         depModules = monad.resolve (flake'.exports.${modName}.nixosModules or []) crossSystem;
         extraModules' = monad.resolve extraModules {
           inherit crossSystem;

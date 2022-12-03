@@ -90,6 +90,7 @@ in {
       inherit crossSystem;
       overlays = (monad.resolve (flake'.exports.${signalModuleName}.overlays or []) crossSystem) ++ selfOverlays;
     };
+  resolved.stdlib = {nixpkgs'}: nixpkgs'.lib.extend (final: prev: {signal = self.lib;});
   resolve = {
     flake,
     name ? "<unknown>",
