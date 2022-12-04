@@ -48,7 +48,6 @@ in {
           ...
         }: {
           config = {
-            networking.hostName = lib.mkDefault (hostNameMap.${modName} or hostNameMap.__default or modName);
             home-manager = {
               sharedModules =
                 (exports.homeManagerModules or [])
@@ -93,9 +92,24 @@ in {
             inherit
               flake'
               crossSystem
-              extraModules
               home-manager
               ;
+            extraModules =
+              (monad.resolve extraModules {
+                inherit crossSystem;
+                moduleName = modName;
+              })
+              ++ [
+                ({
+                  config,
+                  lib,
+                  ...
+                }: {
+                  config = {
+                    networking.hostName = lib.mkDefault (hostNameMap.${modName} or hostNameMap.__default or modName);
+                  };
+                })
+              ];
             exports = exports.${modName};
             localSystem =
               if localSystem != null
