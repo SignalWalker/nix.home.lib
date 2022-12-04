@@ -37,7 +37,7 @@ in {
     lib = pkgsLibExtended;
     modules =
       (exports.nixosModules or [])
-      (monad.resolve extraModules {
+      ++ (monad.resolve extraModules {
         inherit crossSystem;
         moduleName = signalModuleName;
       })
