@@ -24,7 +24,7 @@ in {
     exports ? (signal.flake.resolved.exports {inherit flake' crossSystem;}).${signalModuleName},
     home-manager ? flake'.inputs.home-manager,
     selfOverlays ? set.select (flake'.overlays or {}) ["default" crossSystem signalModuleName],
-    nixpkgs ? flake.inputs.nixpkgs,
+    nixpkgs ? flake'.inputs.nixpkgs,
     nixpkgs' ?
       signal.flake.resolved.nixpkgs {
         inherit nixpkgs flake' signalModuleName crossSystem selfOverlays;
