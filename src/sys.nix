@@ -1,6 +1,7 @@
 {
   self,
   nixpkgs,
+  home-manager,
   ...
 }:
 with builtins; let
@@ -12,17 +13,20 @@ with builtins; let
   signal = self.lib.signal;
 in {
   crossSystems = ["x86_64-linux" "aarch64-linux"];
-  configuration.genArgsFromFlake = {
+  configuration.genArgsFromFlake' = {
     flake',
     signalModuleName,
     crossSystem,
-    extraModules ? {
+    extraNixosModules ? {
+      crossSystem,
+      moduleName,
+    }: [],
+    extraHomeModules ? {
       crossSystem,
       moduleName,
     }: [],
     localSystem ? builtins.currentSystem or crossSystem,
     exports ? (signal.flake.resolved.exports {inherit flake' crossSystem;}).${signalModuleName},
-    home-manager ? flake'.inputs.home-manager,
     selfOverlays ? set.select (flake'.overlays or {}) ["default" crossSystem signalModuleName],
     nixpkgs ? flake'.inputs.nixpkgs,
     nixpkgs' ?
@@ -31,6 +35,16 @@ in {
         exportedOverlays = exports.overlays;
       },
     pkgsLibExtended ? signal.flake.resolved.stdlib {inherit nixpkgs';},
+    home-manager ? flake'.inputs.home-manager or home-manager,
+    homeManagerModules ?
+      (self.lib.home.configuration.genModulesFromFlake' {
+        inherit flake' signalModuleName crossSystem localSystem exports;
+        isNixOS = true;
+      })
+      ++ (monad.resolve extraHomeModules {
+        inherit crossSystem;
+        moduleName = signalModuleName;
+      }),
   }: {
     system = crossSystem;
     pkgs = nixpkgs';
@@ -50,16 +64,7 @@ in {
         }: {
           config = {
             home-manager = {
-              sharedModules =
-                (exports.homeManagerModules or [])
-                ++ (set.select (flake'.homeManagerModules or {}) ["default" crossSystem signalModuleName])
-                ++ [
-                  ({...}: {
-                    config = {
-                      system.isNixOS = true;
-                    };
-                  })
-                ];
+              sharedModules = homeManagerModules;
               extraSpecialArgs.lib = import "${home-manager}/modules/lib/stdlib-extended.nix" pkgsLibExtended;
               useGlobalPkgs = true;
               useUserPackages = true;
@@ -89,7 +94,7 @@ in {
       foldl' (modAcc: modName:
         modAcc
         // {
-          "${crossSystem}-${modName}" = nixpkgs.lib.nixosSystem (sys.configuration.genArgsFromFlake {
+          "${crossSystem}-${modName}" = nixpkgs.lib.nixosSystem (sys.configuration.genArgsFromFlake' {
             inherit
               flake'
               crossSystem

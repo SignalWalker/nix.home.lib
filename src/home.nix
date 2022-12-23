@@ -8,12 +8,14 @@ with builtins; let
   std = nixpkgs.lib;
   lib = self.lib;
   home = lib.home;
+  signal = lib.signal;
   module = lib.signal.module;
   sigflake = lib.signal.flake;
   monad = lib.monad;
   set = lib.set;
+  option = lib.option;
 in {
-  systems = ["x86_64-linux" "aarch64-linux"];
+  crossSystems = ["x86_64-linux" "aarch64-linux"];
   linkSystemApp = pkgs: {
     app,
     pname ? "system-${app}",
@@ -26,59 +28,78 @@ in {
         ln -sT ${syspath} $out/bin/${app}
       ''
       + (concatStringsSep "\n" (map (app: "ln -sT ${syspathBase}/${app} $out/bin/${app}") extraApps)));
+  configuration.genModulesFromFlake' = {
+    flake',
+    signalModuleName,
+    crossSystem,
+    isNixOS ? true,
+    localSystem ? builtins.currentSystem or crossSystem,
+    exports ? (signal.flake.resolved.exports {inherit flake' crossSystem;}).${signalModuleName},
+  }:
+    (exports.homeManagerModules or [])
+    ++ (set.select (flake'.homeManagerModules or {}) ["default" crossSystem signalModuleName])
+    ++ [({...}: {config.system.isNixOS = isNixOS;})];
+  configuration.genArgsFromFlake' = {
+    flake',
+    signalModuleName,
+    crossSystem,
+    isNixOS ? true,
+    extraModules ? {
+      crossSystem,
+      moduleName,
+    }: [],
+    localSystem ? builtins.currentSystem or crossSystem,
+    exports ? (signal.flake.resolved.exports {inherit flake' crossSystem;}).${signalModuleName},
+    selfOverlays ? set.select (flake'.overlays or {}) ["default" crossSystem signalModuleName],
+    nixpkgs ? flake'.inputs.nixpkgs,
+    nixpkgs' ?
+      signal.flake.resolved.nixpkgs {
+        inherit nixpkgs flake' signalModuleName crossSystem selfOverlays;
+        exportedOverlays = exports.overlays;
+      },
+    pkgsLibExtended ? signal.flake.resolved.stdlib {inherit nixpkgs';},
+    extraSpecialArgs ? {},
+  }: {
+    pkgs = nixpkgs';
+    lib = pkgsLibExtended;
+    modules =
+      (home.configuration.genModulesFromFlake' {inherit flake' signalModuleName crossSystem localSystem exports isNixOS;})
+      ++ (monad.resolve extraModules {
+        inherit crossSystem;
+        moduleName = signalModuleName;
+      });
+    inherit extraSpecialArgs;
+  };
   configuration.fromFlake = {
     flake,
-    nixpkgs ? flake.inputs.nixpkgs,
-    homeRoot ? "/home",
-    username ? "ash",
-    moduleNames ? ["default"],
-    systems ? home.systems,
+    isNixOS ? true,
     flakeName ? "<unknown>",
-    localSystem ? null,
-    extraModules ? [],
+    moduleNames ? ["default"],
+    crossSystems ? home.crossSystems,
+    localSystem ? builtins.currentSystem or null,
+    extraModules ? {
+      crossSystem,
+      moduleName,
+    }: [],
+    home-manager ? flake.inputs.home-manager or home-manager,
   }: let
-    flake' = assert traceVerbose "home.configuration.fromFlake(${flakeName}).flake'" true;
-      sigflake.resolve {
-        inherit flake;
-        name = flakeName;
-      };
+    flake' = sigflake.resolve {
+      inherit flake;
+      name = flakeName;
+    };
   in
-    assert traceVerbose "home.configuration.fromFlake ${flakeName}" true;
-      std.genAttrs systems (system:
-        std.genAttrs moduleNames (name:
-          assert traceVerbose "home.configuration.fromFlake(${flakeName}) ${system}.${name}" true; let
-            pkgs = import nixpkgs {
-              localSystem =
-                if localSystem != null
-                then localSystem
-                else builtins.currentSystem or system;
-              crossSystem = system;
-              overlays = let
-                expOverlays = monad.resolve (flake'.exports.${name}.overlays or []) system;
-              in
-                (std.traceSeq ["home.configuration.fromFlake(${flakeName})(${system}.${name}) overlays@" expOverlays] expOverlays)
-                ++ (set.select (flake'.overlays or {}) ["default" system]);
-            };
-            depModules =
-              traceVerbose "home.configuration.fromFlake(${flakeName})(${system}.${name}).depModules"
-              (monad.resolve (flake'.exports.${name}.homeManagerModules or []) system);
-          in
-            home-manager.lib.homeManagerConfiguration {
-              inherit pkgs;
-              lib = pkgs.lib.extend (final: prev: {signal = self.lib;});
-              modules = assert std.traceSeq ["home.configuration.fromFlake(${flakeName}})(${system}.${name}).modules depModules@" depModules] true;
-                depModules
-                ++ [(flake'.homeManagerModules.${name} or ({...}: {}))]
-                ++ [
-                  ({config, ...}: {
-                    config = {
-                      home.username = username;
-                      home.homeDirectory = "${homeRoot}/${username}";
-                    };
-                  })
-                ]
-                ++ extraModules;
-            }));
+    std.genAttrs crossSystems (
+      crossSystem: let
+        localSystem = option.unwrapOr localSystem crossSystem;
+      in
+        std.genAttrs moduleNames (
+          signalModuleName:
+            home-manager.lib.homeManagerConfiguration (home.configuration.genArgsFromFlake' {
+              inherit flake' signalModuleName crossSystem extraModules localSystem isNixOS;
+              inherit (flake'.inputs) nixpkgs;
+            })
+        )
+    );
   package.fromHomeConfigurations = sysHomeConfigs:
     mapAttrs (system: homeConfigs:
       assert traceVerbose "home.package.fromHomeConfigurations ${system}: {${toString (attrNames homeConfigs)}}" true;

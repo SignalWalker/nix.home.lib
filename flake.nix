@@ -43,6 +43,7 @@
         signal = import ./src/signal.nix flakeInputs;
         sys = import ./src/sys.nix flakeInputs;
         inherit utils;
+        option = import ./src/option.nix flakeInputs;
         mkDefaultEnableOption = name: (std.mkEnableOption name) // {default = true;};
         genNixpkgsForList = {
           nixpkgs,
