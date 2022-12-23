@@ -41,6 +41,7 @@ in {
         inherit crossSystem;
         moduleName = signalModuleName;
       })
+      ++ (set.select (flake'.nixosModules or {}) ["default" crossSystem signalModuleName])
       ++ [
         ({
           config,
