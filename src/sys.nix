@@ -80,8 +80,14 @@ in {
     home-manager ? flake.inputs.home-manager,
     localSystem ? null,
     crossSystems ? sys.crossSystems,
-    extraModules ? [],
-    hostNameMap ? {},
+    extraNixosModules ? {
+      crossSystem,
+      moduleName,
+    }: [],
+    extraHomeModules ? {
+      crossSystem,
+      moduleName,
+    }: [],
   }: let
     flake' = self.lib.signal.flake.resolve {
       inherit flake;
@@ -100,22 +106,7 @@ in {
               crossSystem
               home-manager
               ;
-            extraModules =
-              (monad.resolve extraModules {
-                inherit crossSystem;
-                moduleName = modName;
-              })
-              ++ [
-                ({
-                  config,
-                  lib,
-                  ...
-                }: {
-                  config = {
-                    networking.hostName = lib.mkDefault (hostNameMap.${modName} or hostNameMap.__default or modName);
-                  };
-                })
-              ];
+            inherit extraNixosModules extraHomeModules;
             exports = exports.${modName};
             localSystem =
               if localSystem != null
