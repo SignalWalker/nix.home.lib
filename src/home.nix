@@ -22,8 +22,9 @@ in {
     syspathBase ? "/usr/bin",
     syspath ? "${syspathBase}/${app}",
     extraApps ? [],
+    extraArgs ? {},
   }:
-    pkgs.runCommandLocal pname {} (''
+    pkgs.runCommandLocal pname extraArgs (''
         mkdir -p $out/bin
         ln -sT ${syspath} $out/bin/${app}
       ''
