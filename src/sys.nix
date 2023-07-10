@@ -13,9 +13,13 @@ with builtins; let
   signal = self.lib.signal;
 in {
   crossSystems = ["x86_64-linux" "aarch64-linux"];
+  # Generate argument map for `nixpkgs.lib.nixosSystem`
   configuration.genArgsFromFlake' = {
+    # Output from `signal.flake.resolve`
     flake',
+    # signalModule from which to generate arguments
     signalModuleName,
+    # target system
     crossSystem,
     extraNixosModules ? {
       crossSystem,
