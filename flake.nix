@@ -58,9 +58,11 @@
           nixpkgs,
           overlayFn,
           systems,
+          allowUnfree,
         }:
           std.genAttrs systems (system:
             import nixpkgs {
+              config.allowUnfree = allowUnfree;
               localSystem = builtins.currentSystem or system;
               crossSystem = system;
               overlays = overlayFn system;

@@ -21,6 +21,7 @@ in {
     signalModuleName,
     # target system
     crossSystem,
+    allowUnfree,
     extraNixosModules ? {
       crossSystem,
       moduleName,
@@ -35,7 +36,7 @@ in {
     nixpkgs ? flake'.inputs.nixpkgs,
     nixpkgs' ?
       signal.flake.resolved.nixpkgs {
-        inherit nixpkgs flake' signalModuleName crossSystem selfOverlays;
+        inherit nixpkgs flake' signalModuleName crossSystem selfOverlays allowUnfree;
         exportedOverlays = exports.overlays;
       },
     pkgsLibExtended ? signal.flake.resolved.stdlib {inherit nixpkgs';},
@@ -84,6 +85,7 @@ in {
     home-manager ? flake.inputs.home-manager,
     localSystem ? null,
     crossSystems ? sys.crossSystems,
+    allowUnfree,
     extraNixosModules ? {
       crossSystem,
       moduleName,
@@ -110,6 +112,7 @@ in {
               crossSystem
               home-manager
               ;
+            inherit allowUnfree;
             inherit extraNixosModules extraHomeModules;
             exports = exports.${modName};
             localSystem =

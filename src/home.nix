@@ -45,6 +45,7 @@ in {
     signalModuleName,
     crossSystem,
     isNixOS ? true,
+    allowUnfree,
     extraModules ? {
       crossSystem,
       moduleName,
@@ -55,7 +56,7 @@ in {
     nixpkgs ? flake'.inputs.nixpkgs,
     nixpkgs' ?
       signal.flake.resolved.nixpkgs {
-        inherit nixpkgs flake' signalModuleName crossSystem selfOverlays;
+        inherit nixpkgs flake' signalModuleName crossSystem selfOverlays allowUnfree;
         exportedOverlays = exports.overlays;
       },
     pkgsLibExtended ? signal.flake.resolved.stdlib {inherit nixpkgs';},
@@ -74,6 +75,7 @@ in {
   configuration.fromFlake = {
     flake,
     isNixOS ? true,
+    allowUnfree,
     flakeName ? "<unknown>",
     moduleNames ? ["default"],
     crossSystems ? home.crossSystems,
@@ -96,7 +98,7 @@ in {
         std.genAttrs moduleNames (
           signalModuleName:
             home-manager.lib.homeManagerConfiguration (home.configuration.genArgsFromFlake' {
-              inherit flake' signalModuleName crossSystem extraModules localSystem isNixOS;
+              inherit flake' signalModuleName crossSystem extraModules localSystem isNixOS allowUnfree;
               inherit (flake'.inputs) nixpkgs;
             })
         )

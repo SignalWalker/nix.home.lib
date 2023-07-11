@@ -81,6 +81,7 @@ in {
     flake',
     signalModuleName,
     crossSystem,
+    allowUnfree,
     localSystem ? builtins.currentSystem or crossSystem,
     selfOverlays ? set.select (flake'.overlays or {}) ["default" crossSystem signalModuleName],
     exportedOverlays ? monad.resolve (flake'.exports.${signalModuleName}.overlays or []) crossSystem,
@@ -88,6 +89,7 @@ in {
     import nixpkgs {
       inherit localSystem;
       inherit crossSystem;
+      config.allowUnfree = allowUnfree;
       overlays = exportedOverlays ++ selfOverlays;
     };
   resolved.stdlib = {nixpkgs'}: nixpkgs'.lib.extend (final: prev: {signal = self.lib;});
