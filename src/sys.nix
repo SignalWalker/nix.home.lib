@@ -80,7 +80,9 @@ in {
   };
   configuration.fromFlake = {
     flake,
-    flakeName ? "<unknown>",
+    # the name of the signalModule from which to generate a configuration
+    module ? "default",
+    flakeName ? module,
     nixpkgs ? flake.inputs.nixpkgs,
     home-manager ? flake.inputs.home-manager,
     localSystem ? null,
@@ -96,32 +98,36 @@ in {
     }: [],
   }: let
     flake' = self.lib.signal.flake.resolve {
-      inherit flake;
+      inherit flake module;
       name = flakeName;
     };
   in
-    foldl' (sysAcc: crossSystem: let
-      exports = signal.flake.resolved.exports {inherit flake' crossSystem;};
-    in
-      foldl' (modAcc: modName:
-        modAcc
-        // {
-          "${crossSystem}-${modName}" = nixpkgs.lib.nixosSystem (sys.configuration.genArgsFromFlake' {
-            inherit
-              flake'
-              crossSystem
-              home-manager
-              ;
-            inherit allowUnfree;
-            inherit extraNixosModules extraHomeModules;
-            exports = exports.${modName};
-            localSystem =
-              if localSystem != null
-              then localSystem
-              else builtins.currentSystem or crossSystem;
-            signalModuleName = modName;
-          });
-        })
-      sysAcc (attrNames flake'.nixosModules)) {}
+    foldl' (
+      sysAcc: crossSystem: let
+        exports = signal.flake.resolved.exports {inherit flake' crossSystem;};
+      in
+        foldl' (modAcc: modName:
+          modAcc
+          // {
+            "${crossSystem}-${modName}" = nixpkgs.lib.nixosSystem (sys.configuration.genArgsFromFlake' {
+              inherit
+                flake'
+                crossSystem
+                home-manager
+                ;
+              inherit allowUnfree;
+              inherit extraNixosModules extraHomeModules;
+              exports = exports.${modName};
+              localSystem =
+                if localSystem != null
+                then localSystem
+                else builtins.currentSystem or crossSystem;
+              signalModuleName = modName;
+            });
+          })
+        sysAcc
+        (attrNames flake'.nixosModules)
+    )
+    {}
     crossSystems;
 }

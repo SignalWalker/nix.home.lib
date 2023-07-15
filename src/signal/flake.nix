@@ -97,26 +97,49 @@ in {
     flake',
     crossSystem,
   }:
-    mapAttrs (module: outputs: mapAttrs (key: export: monad.resolve export crossSystem) outputs) flake'.exports;
+  # Result: {
+  #   ${module} = {
+  #     ${key} = monad.resolve export crossSystem;
+  #   };
+  # }
+    mapAttrs (
+      module: outputs:
+        mapAttrs (
+          key: export:
+            monad.resolve export crossSystem
+        )
+        outputs
+    )
+    flake'.exports;
   resolve = {
     flake,
-    name ? "<unknown>",
+    # the name of the signalModule to resolve
+    module,
+    name ? module,
   }:
-    assert traceVerbose "flake.resolve ${name} flake.inputs@{${toString (attrNames flake.inputs)}}" true;
-    assert (attrNames (flake.signalModules or {"default" = {};})) == ["default"]; # otherwise unsupported
-    
-      let
-        flakeDeps = assert traceVerbose "flake.resolve(${name}).flakeDeps" true; signal.flake.dependencies.get {inherit flake name;};
-        flakeRes = assert traceVerbose "flake.resolve(${name}).flakeRes" true;
-          signal.flake.resolve' {
-            inherit flake name;
-            dependencies = flakeDeps;
-          };
-        flake' = traceVerbose "flake.resolve(${name}).flake'" flakeRes.flake;
-        resDeps = traceVerbose "flake.resolve(${name}).resDeps" flakeRes.resolvedDependencies;
-        exports = traceVerbose "flake.resolve(${name}).exports" (foldl' (acc: depName: set.mConcat acc resDeps.${depName}.outputs) (flake'.exports.default or {}) (attrNames flakeDeps));
-      in
-        flake' // {exports.default = traceVerbose "flake.resolve(${name}) exports.default@{${toString (attrNames exports)})}" exports;};
+    assert traceVerbose "flake.resolve ${name} flake.inputs@{${toString (attrNames flake.inputs)}}" true; let
+      flakeDeps = assert traceVerbose "flake.resolve(${name}).flakeDeps" true; signal.flake.dependencies.get {inherit flake name;};
+      flakeRes = assert traceVerbose "flake.resolve(${name}).flakeRes" true;
+        signal.flake.resolve' {
+          inherit flake name;
+          dependencies = flakeDeps;
+        };
+      flake' = traceVerbose "flake.resolve(${name}).flake'" flakeRes.flake;
+      resDeps = traceVerbose "flake.resolve(${name}).resDeps" flakeRes.resolvedDependencies;
+      exports =
+        traceVerbose "flake.resolve(${name}).exports"
+        (
+          foldl'
+          (acc: depName: set.mConcat acc resDeps.${depName}.outputs)
+          (flake'.exports.${module} or flake'.exports."default" or {})
+          (attrNames flakeDeps)
+        );
+    in
+      std.recursiveUpdate flake' {
+        exports.${module} =
+          traceVerbose "flake.resolve(${name}) exports.${module}@{${toString (attrNames exports)})}"
+          exports;
+      };
   resolve' = {
     dependencies,
     flake,
